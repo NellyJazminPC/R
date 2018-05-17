@@ -1,4 +1,4 @@
-## Gráfico de ADMIXTURE
+## Gráficas de ADMIXTURE
 
 ````
 setwd("/home/n311/Escritorio/R_tarea/bin/")
