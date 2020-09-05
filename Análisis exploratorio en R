@@ -1,0 +1,152 @@
+#### Establecer el directorio de trabajo
+setwd("/media/nel_pc/n311_pc/Campos_Project_003_Analysis/data_metadata_5/CGUM_79/Figuras/")
+
+##### Limpiar ambiente
+rm(list = ls(all=TRUE))
+
+##### Cargar librerías
+library(vcfR)
+library(adegenet)
+library(poppr)
+library(ape)
+library(RColorBrewer)
+library(ggplot2)
+library(devtools)
+library(plotly)
+library(PopGenome)
+library(dartR)
+library(mmod)
+library(StAMPP)
+library(igraph)
+library(reshape2)
+library(scatterplot3d)
+
+### Cargar el archivo VCF
+CGUM_79_1.VCF <- read.vcfR("/media/nel_pc/n311_pc/Campos_Project_003_Analysis/data_metadata_5/CGUM_79/var.79.2.1.sorted.vcf")
+CGUM_79_1.VCF
+### Cargar base de datos extra en formato .CSV
+pop.data <- read.csv("/media/nel_pc/n311_pc/Campos_Project_003_Analysis/data_metadata_5/Qmacdougalli_79ind_stacks.csv")
+
+### Visualizar las primeras filas
+head (pop.data)
+### Verificar
+all(colnames(CGUM_79_1.VCF@gt)[-1] == pop.data$NOM_IND)
+
+### Convertir la base de datos a objetos genlight y establecer la ploidía
+cgum_79_1_vcf <- vcfR2genlight(CGUM_79_1.VCF)
+cgum_79_1_vcf_pop <- vcfR2genlight(CGUM_79_1.VCF)
+ploidy(cgum_79_1_vcf) <- 2
+cgum_79_1_vcf@ploidy
+
+
+#Cambio de POP a las posibles poblaciones $SITIO del archivo CSV
+pop(cgum_79_1_vcf) <- pop.data$SITIO
+#Cambio de POP a las posibles poblaciones $POP del archivo CSV
+pop(cgum_79_1_vcf_pop) <- pop.data$POP
+
+###Convertir de genlight a genind y a genclone para SITIOS
+#install dartR  gl2 convertir de genlight to genind
+cgum_79_1_genind <- gl2gi(cgum_79_1_vcf, v=1)
+cgum_79_1_genclone <- as.genclone(cgum_79_1_genind)
+
+#Para POP
+cgum_79_1_vcf_pop_genind <- gl2gi(cgum_79_1_vcf_pop, v=1)
+cgum_79_1_vcf_pop_genclone <- as.genclone(cgum_79_1_vcf_pop_genind)
+
+#strata(cgum_79_1_genind) <- data.frame(pop.data$SITIO)  
+
+####### Calcular Matrices de distancias
+cgum_79_1.dist <- dist(cgum_79_1_vcf)
+cgum_79_1.dist.x <- poppr::bitwise.dist(cgum_79_1_vcf  , percent = T, euclidean = F, mat = T)
+
+#Visualización del missing data
+glPlot(cgum_79_1_vcf, legend = T)
+
+#Derivar la distribución de frecuencias alélicas
+myFreq <- glMean(cgum_79_1_vcf)
+myFreq <- c(myFreq, 1-myFreq)
+# Grafica
+hist(myFreq, proba=TRUE, col="darkseagreen3",ylab = "Densidad", xlab="Frecuencias alÃ©licas",
+     main="DistribuciÃ³n de frecuencias alÃ©licas", nclass=20, ylim = c(0,5))
+# Densidad
+temp <- density(myFreq, bw=.05)
+lines(temp$x, temp$y*2,lwd=2)
+# Buscar missing data
+head(glNA(cgum_79_1_vcf),200)
+head(myFreq)
+
+
+###### Calcular un árbol de distancias
+
+tree <- aboot(cgum_79_1_vcf, tree = "nj", 
+              distance = bitwise.dist, sample = 500, 
+              showtree = F, cutoff = 50, quiet = T)
+
+# Guardar el archivo en formato .tree para usar en el programa GENEIOUS
+write.tree(tree)
+write.tree(tree, file = 'tree_glfts_2pop_2pop_79.2.tre')
+
+# Calcular el valor de correlación cophenetic (cofenética)
+tree_qmacd=cophenetic(tree)
+# Guardar la matriz de distancias en un archivo de texto
+write.table(tree_qmacd, file = 'taxa_pairwise_dist_qmacd.txt',
+            sep = '\t', quote = FALSE, col.names=NA)
+            
+
+# Establecer los colores a utilizar para las gráficas
+cols <- c("#7570B3", "#075277","#00B1E8","#1FC944",
+          "#E6AB02", "#E7298A","#E07E34", "#F15858")
+
+# Graficar el árbol de distancias
+plot.phylo(tree, type = "fan", use.edge.length = T, rotate.tree = 170, 
+           edge.color = "black", node.pos = 2, 
+           show.tip.label = TRUE, edge.width = 1, cex = .6, font = 1, 
+           tip.color =  cols[pop(cgum_79_1_vcf)], no.margin = F)
+
+#######Extra
+nodelabels(tree$node.label, adj = c(0.1, -0.5), frame = "n", cex = 0.6,font = 1, xpd = TRUE)
+legend("topright", legend = c("Comaltepec-Yolox","IxtlÃ¡n"), fill = cols, border = FALSE, bty = "n", cex = 0.3)
+axis(side = 1)
+title(xlab = "Distancia genética (proporción de loci que son diferentes)", cex=0.5 )
+
+### Calcular un árbol por sitios 
+
+#Cambiar los niveles de sitios a dos POP
+glnew <- gl.edit.recode.pop(cgum_79_1_vcf)
+levels(pop(glnew))
+
+#Árbol nj que resume la similitud genética entre los sitios
+tree_sitios_79.1 <- gl.tree.nj(glnew, type="fan")
+#Exportar el arbol para GENEIOUS
+
+write.tree(tree_sitios_79.1, file = 'tree_sitios_79.2.tre')
+
+### TIP #Para cambiar los márgenes
+      par("mar")
+       par(mar=c(1,2,1,2))
+       
+############## Realizar un Análisis de Coordenadas Principales (PCoA) 
+
+pc <- gl.pcoa(cgum_79_1_vcf, nfactors=80)
+names(pc)
+barplot(pc$eig/sum(pc$eig)*100) 
+
+gl.pcoa.plot(pc, cgum_79_1_vcf, labels="pop", xaxis=2, yaxis=1, ellipse = F )
+
+#Cambiar los niveles de sitios a dos POP
+glnew <- gl.edit.recode.pop(glfst)
+levels(pop(glnew))
+levels(pop(glnew)) <- c(rep("POP1",3),rep("POP2",5))
+gl.pcoa.plot(pc, glnew, labels="pop", xaxis=1, yaxis=2)
+
+#Opcion interactiva
+gl.pcoa.plot(pc, glnew, labels="interactive", xaxis=2, yaxis=3)
+ggplotly()
+
+gl.pcoa.scree(pc)
+
+# Opción en 3D
+gl.pcoa.plot.3d(pc, glnew)
+
+
+
