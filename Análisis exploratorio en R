@@ -22,10 +22,10 @@ library(reshape2)
 library(scatterplot3d)
 
 ### Cargar el archivo VCF
-CGUM_79_1.VCF <- read.vcfR("/media/nel_pc/n311_pc/Campos_Project_003_Analysis/data_metadata_5/CGUM_79/var.79.2.1.sorted.vcf")
+CGUM_79_1.VCF <- read.vcfR("../var.79.2.1.sorted.vcf")
 CGUM_79_1.VCF
 ### Cargar base de datos extra en formato .CSV
-pop.data <- read.csv("/media/nel_pc/n311_pc/Campos_Project_003_Analysis/data_metadata_5/Qmacdougalli_79ind_stacks.csv")
+pop.data <- read.csv("../Qmacdougalli_79ind_stacks.csv")
 
 ### Visualizar las primeras filas
 head (pop.data)
